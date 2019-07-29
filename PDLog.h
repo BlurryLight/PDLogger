@@ -6,14 +6,15 @@
 
 #include <atomic>
 #include <chrono>
-#include <ctime>  //std::localtime
+#include <ctime> //std::localtime
 #include <fstream>
-#include <iomanip>  //std::iomanip
+#include <iomanip> //std::put_time
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 namespace {
@@ -22,30 +23,34 @@ namespace {
  * @brief format_time
  * @return std::string formatted as "year/mo/dy hour:min:sec.ms(3 digits)
  */
-inline std::string format_time() {
-  auto now = std::chrono::system_clock::now();
-  auto in_time_t = std::chrono::system_clock::to_time_t(now);
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                now.time_since_epoch()) %
-            1000;
+inline std::string format_time()
+{
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
-  std::stringstream ss;
-  ss << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %X") << '.'
-     << std::setfill('0') << std::setw(3) << ms.count();
-  return ss.str();
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y/%m/%d %X") << '.' << std::setfill('0')
+       << std::setw(3) << ms.count();
+    return ss.str();
 }
 
-}  // namespace
+std::size_t threadid_to_index(const std::thread::id id)
+{
+    static std::size_t nextindex = 0;
+    static std::mutex my_mutex;
+    static std::unordered_map<std::thread::id, std::size_t> ids;
+    std::lock_guard<std::mutex> lock(my_mutex);
+    if (ids.find(id) == ids.end())
+        ids[id] = nextindex++;
+    return ids[id];
+}
+
+} // namespace
 
 namespace pd {
 
-enum class log_level : uint8_t {
-  TRACE = 0,
-  DEBUG = 1,
-  INFO = 2,
-  WARNING = 3,
-  ERROR = 4
-};
+enum class log_level : uint8_t { TRACE = 0, DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 };
 
 //  using a lambda for hash_helper is impossible because it's a variable rather
 //  than a type The best practice is struct functor The example of url
@@ -58,18 +63,18 @@ enum class log_level : uint8_t {
 /**
  * @brief translate log_level to string
  */
-struct log_level_hash_helper {
-  size_t operator()(log_level t) const noexcept {
-    return static_cast<size_t>(t);
-  }
+struct log_level_hash_helper
+{
+    size_t operator()(log_level t) const noexcept { return static_cast<size_t>(t); }
 };
 
-const std::unordered_map<log_level, std::string, log_level_hash_helper>
-    level2string{
-        {log_level::INFO, " [INFO] "},   {log_level::TRACE, " [TRACE] "},
-        {log_level::DEBUG, " [DEBUG] "}, {log_level::WARNING, " [WARNING] "},
-        {log_level::ERROR, " [ERROR] "},
-    };
+const std::unordered_map<log_level, std::string, log_level_hash_helper> level2string{
+    {log_level::INFO, " [INFO] "},
+    {log_level::TRACE, " [TRACE] "},
+    {log_level::DEBUG, " [DEBUG] "},
+    {log_level::WARNING, " [WARNING] "},
+    {log_level::ERROR, " [ERROR] "},
+};
 
 /**
  * @brief
@@ -102,68 +107,103 @@ using logger_config_t = std::unordered_map<std::string, std::string>;
  * @brief The logger_base class is an ABSTRACT-CLASS which has some defined
  * interfaces
  */
-class logger_base {
- public:
-  //  logger_base(const logger_config_t& config) {}
+class logger_base
+{
+public:
+    //  logger_base(const logger_config_t& config) {}
 
-  virtual void log(const std::string&, const log_level) = 0;
-  virtual void log(const std::string&) = 0;
-  virtual ~logger_base() = 0;
+    virtual void log(const std::string &, const log_level) = 0;
+    virtual void log(const std::string &) = 0;
+    virtual ~logger_base() = 0;
 
-  logger_base() {}
+    logger_base() {}
 
- protected:
-  std::mutex mutex_;
-  uint8_t id_;
+protected:
+    std::mutex mutex_;
+    uint8_t id_;
 };
 
-class std_out_logger : public logger_base {
- public:
-  std_out_logger() = delete;
-  std_out_logger(const logger_config_t& config);
-  void log(const std::string&, const log_level) override;
-  void log(const std::string&) override;
-  ~std_out_logger() override {}
+class std_out_logger : public logger_base
+{
+public:
+    std_out_logger() = delete;
+    std_out_logger(const logger_config_t &config);
+    void log(const std::string &, const log_level) override;
+    void log(const std::string &) override;
+    ~std_out_logger() override {}
 
- private:
-  const std::unordered_map<log_level, std::string, log_level_hash_helper>
-      levels_;
+private:
+    const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
 };
 
-using logger_creator = logger_base* (*)(const logger_config_t&);
+class file_logger : public logger_base
+{
+public:
+    file_logger() = delete;
+    file_logger(const logger_config_t &config);
+    void log(const std::string &, const log_level) override;
+    void log(const std::string &) override;
+    ~file_logger() override {}
 
-class logger_factory {
- public:
-  logger_factory();
-  logger_base* produce(const logger_config_t& config);
-
- protected:
-  std::unordered_map<std::string, logger_creator> creators;
+private:
+    void roll_a_file();
+    const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
+    std::string filename_;
+    std::unique_ptr<std::ofstream> os_;
 };
 
-inline logger_factory& get_factory();
-logger_base& get_logger(const logger_config_t& config = {{"type", "std_out"}});
+using logger_creator = logger_base *(*) (const logger_config_t &);
 
-inline void log(const std::string& message, const log_level lv) {
-  if (!check_log_level(lv)) return;
-  get_logger().log(message, lv);
+class logger_factory
+{
+public:
+    logger_factory();
+    logger_base *produce(const logger_config_t &config);
+
+protected:
+    std::unordered_map<std::string, logger_creator> creators;
+};
+
+inline logger_factory &get_factory();
+logger_base &get_logger(const logger_config_t &config = {{"type", "std_out"}});
+
+inline void init_logger(const logger_config_t &config)
+{
+    get_logger(config);
 }
 
-inline void log(const std::string& message) { get_logger().log(message); }
+inline void log(const std::string &message, const log_level lv)
+{
+    if (!check_log_level(lv))
+        return;
+    get_logger().log(message, lv);
+}
 
-inline void TRACE(const std::string& message) {
-  log(message, log_level::TRACE);
-};
-inline void DEBUG(const std::string& message) {
-  log(message, log_level::DEBUG);
-};
-inline void INFO(const std::string& message) { log(message, log_level::INFO); };
+inline void log(const std::string &message)
+{
+    get_logger().log(message);
+}
 
-inline void WARN(const std::string& message) {
-  log(message, log_level::WARNING);
+inline void TRACE(const std::string &message)
+{
+    log(message, log_level::TRACE);
 };
-inline void ERROR(const std::string& message) {
-  log(message, log_level::ERROR);
+inline void DEBUG(const std::string &message)
+{
+    log(message, log_level::DEBUG);
+};
+inline void INFO(const std::string &message)
+{
+    log(message, log_level::INFO);
 };
 
-}  // namespace pd
+inline void WARN(const std::string &message)
+{
+    log(message, log_level::WARNING);
+};
+inline void ERROR(const std::string &message)
+{
+    log(message, log_level::ERROR);
+};
+
+} // namespace pd
