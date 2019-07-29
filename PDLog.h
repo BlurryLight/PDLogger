@@ -16,6 +16,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -112,7 +113,7 @@ class logger_base
 public:
     //  logger_base(const logger_config_t& config) {}
 
-    virtual void log(const std::string &, const log_level) = 0;
+    virtual void log(const std::string &, const log_level);
     virtual void log(const std::string &) = 0;
     virtual ~logger_base() = 0;
 
@@ -128,7 +129,7 @@ class std_out_logger : public logger_base
 public:
     std_out_logger() = delete;
     std_out_logger(const logger_config_t &config);
-    void log(const std::string &, const log_level) override;
+    //    void log(const std::string &, const log_level) override;
     void log(const std::string &) override;
     ~std_out_logger() override {}
 
@@ -141,7 +142,7 @@ class file_logger : public logger_base
 public:
     file_logger() = delete;
     file_logger(const logger_config_t &config);
-    void log(const std::string &, const log_level) override;
+    //    void log(const std::string &, const log_level) override;
     void log(const std::string &) override;
     ~file_logger() override {}
 
@@ -150,6 +151,7 @@ private:
     const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
     std::string filename_;
     std::unique_ptr<std::ofstream> os_;
+    std::unique_ptr<std::vector<char>> buf_;
 };
 
 using logger_creator = logger_base *(*) (const logger_config_t &);
@@ -167,6 +169,13 @@ protected:
 inline logger_factory &get_factory();
 logger_base &get_logger(const logger_config_t &config = {{"type", "std_out"}});
 
+/**
+ * @brief init_logger
+ * Due to the lack of std::filesystem in C++0x, we must make directoreis mannuly when file_name includes slashes.
+ * config example : { {"type":"std_out/file"},{"file_name","logs/test.log"}};
+ * This function will statically iniitialize an logger and it will be alive through the whole lifetiem of the programme.
+ * @param config An ordered_map to pass configs
+ */
 inline void init_logger(const logger_config_t &config)
 {
     get_logger(config);
