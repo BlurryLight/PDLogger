@@ -176,10 +176,6 @@ logger_base &get_logger(const logger_config_t &config = {{"type", "std_out"}});
  * This function will statically iniitialize an logger and it will be alive through the whole lifetiem of the programme.
  * @param config An ordered_map to pass configs
  */
-inline void init_logger(const logger_config_t &config)
-{
-    get_logger(config);
-}
 
 inline void log(const std::string &message, const log_level lv)
 {
@@ -193,26 +189,31 @@ inline void log(const std::string &message)
     get_logger().log(message);
 }
 
+} // namespace pd
+
+// CPP Interface
+inline void init_logger(const pd::logger_config_t &config)
+{
+    pd::get_logger(config);
+}
 inline void TRACE(const std::string &message)
 {
-    log(message, log_level::TRACE);
+    pd::log(message, pd::log_level::TRACE);
 };
 inline void DEBUG(const std::string &message)
 {
-    log(message, log_level::DEBUG);
+    pd::log(message, pd::log_level::DEBUG);
 };
 inline void INFO(const std::string &message)
 {
-    log(message, log_level::INFO);
+    pd::log(message, pd::log_level::INFO);
 };
 
 inline void WARN(const std::string &message)
 {
-    log(message, log_level::WARNING);
+    pd::log(message, pd::log_level::WARNING);
 };
 inline void ERROR(const std::string &message)
 {
-    log(message, log_level::ERROR);
+    pd::log(message, pd::log_level::ERROR);
 };
-
-} // namespace pd
