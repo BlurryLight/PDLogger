@@ -7,16 +7,16 @@ void pd::set_log_level(pd::log_level level)
     log_level_num.store(static_cast<size_t>(level));
 }
 
-bool pd::check_log_level(pd::log_level level)
+bool pd::details::check_log_level(pd::log_level level)
 {
     return static_cast<size_t>(level) >= log_level_num.load(std::memory_order_relaxed);
 }
 
-pd::std_out_logger::std_out_logger(const pd::logger_config_t &config)
+pd::details::std_out_logger::std_out_logger(const pd::details::logger_config_t &config)
     : levels_(level2string)
 {}
 
-//void pd::std_out_logger::log(const std::string &message, const pd::log_level lv)
+//void pd::details::std_out_logger::log(const std::string &message, const pd::details::log_level lv)
 //{
 //    std::string output;
 //    output.reserve(message.length() + 128);
@@ -33,15 +33,15 @@ pd::std_out_logger::std_out_logger(const pd::logger_config_t &config)
 //    log(output);
 //}
 
-void pd::std_out_logger::log(const std::string &message)
+void pd::details::std_out_logger::log(const std::string &message)
 {
     std::cout << message;
     std::cout.flush();
 }
 
-pd::logger_base::~logger_base() {}
+pd::details::logger_base::~logger_base() {}
 
-pd::logger_factory::logger_factory()
+pd::details::logger_factory::logger_factory()
 {
     creators.emplace("std_out", [](const logger_config_t &config) -> logger_base * {
         return new std_out_logger(config);
@@ -51,7 +51,8 @@ pd::logger_factory::logger_factory()
     });
 }
 
-pd::logger_base *pd::logger_factory::produce(const pd::logger_config_t &config)
+pd::details::logger_base *pd::details::logger_factory::produce(
+    const pd::details::logger_config_t &config)
 {
     auto type = config.find("type");
     if (type == config.end()) {
@@ -64,13 +65,13 @@ pd::logger_base *pd::logger_factory::produce(const pd::logger_config_t &config)
     return found->second(config);
 }
 
-pd::logger_factory &pd::get_factory()
+pd::details::logger_factory &pd::details::get_factory()
 {
     static logger_factory factory_singleton;
     return factory_singleton;
 }
 
-pd::logger_base &pd::get_logger(const pd::logger_config_t &config)
+pd::details::logger_base &pd::details::get_logger(const pd::details::logger_config_t &config)
 {
     static std::unique_ptr<logger_base> logger_singleton(get_factory().produce(config));
     return *logger_singleton;
@@ -78,7 +79,7 @@ pd::logger_base &pd::get_logger(const pd::logger_config_t &config)
 
 static std::atomic<size_t> log_id{0};
 
-pd::file_logger::file_logger(const pd::logger_config_t &config)
+pd::details::file_logger::file_logger(const pd::details::logger_config_t &config)
     : levels_(level2string)
     , os_(std::unique_ptr<std::ofstream>(new std::ofstream))
     , buf_(std::unique_ptr<std::vector<char>>(new std::vector<char>))
@@ -98,7 +99,7 @@ pd::file_logger::file_logger(const pd::logger_config_t &config)
     roll_a_file();
 }
 
-void pd::logger_base::log(const std::string &message, const pd::log_level lv)
+void pd::details::logger_base::log(const std::string &message, const pd::log_level lv)
 {
     std::string output;
     output.reserve(message.length() + 256);
@@ -121,7 +122,7 @@ void pd::logger_base::log(const std::string &message, const pd::log_level lv)
     log(output);
 }
 
-void pd::file_logger::log(const std::string &message)
+void pd::details::file_logger::log(const std::string &message)
 {
     log_id++; //atomic operation
     if ((log_id.load(std::memory_order_relaxed) % 10000) == 0) {
@@ -136,7 +137,7 @@ void pd::file_logger::log(const std::string &message)
     //    os_->flush();
 }
 
-void pd::file_logger::roll_a_file()
+void pd::details::file_logger::roll_a_file()
 {
     size_t num_tail = (log_id.load(std::memory_order_relaxed)) / 10000;
     std::lock_guard<std::mutex> lock(mutex_);

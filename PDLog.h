@@ -52,6 +52,7 @@ std::size_t threadid_to_index(const std::thread::id id)
 namespace pd {
 
 enum class log_level : uint8_t { TRACE = 0, DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 };
+namespace details {
 
 //  using a lambda for hash_helper is impossible because it's a variable rather
 //  than a type The best practice is struct functor The example of url
@@ -77,13 +78,6 @@ const std::unordered_map<log_level, std::string, log_level_hash_helper> level2st
     {log_level::ERROR, " [ERROR] "},
 };
 
-/**
- * @brief
- * set the lowest log_level. Any level under it will be discarded.
- * It is defined as an atomic operation so it's thread-safe
- * @param level: the level wanted
- */
-void set_log_level(log_level level);
 /**
  * @brief
  * Called before sending any log to stream. If param level is under the setted
@@ -188,32 +182,41 @@ inline void log(const std::string &message)
 {
     get_logger().log(message);
 }
-
-} // namespace pd
+} //namespace details
 
 // CPP Interface
-inline void init_logger(const pd::logger_config_t &config)
+inline void init_logger(const pd::details::logger_config_t &config)
 {
-    pd::get_logger(config);
+    pd::details::get_logger(config);
 }
 inline void TRACE(const std::string &message)
 {
-    pd::log(message, pd::log_level::TRACE);
+    pd::details::log(message, pd::log_level::TRACE);
 };
 inline void DEBUG(const std::string &message)
 {
-    pd::log(message, pd::log_level::DEBUG);
+    pd::details::log(message, pd::log_level::DEBUG);
 };
 inline void INFO(const std::string &message)
 {
-    pd::log(message, pd::log_level::INFO);
+    pd::details::log(message, pd::log_level::INFO);
 };
 
 inline void WARN(const std::string &message)
 {
-    pd::log(message, pd::log_level::WARNING);
+    pd::details::log(message, pd::log_level::WARNING);
 };
 inline void ERROR(const std::string &message)
 {
-    pd::log(message, pd::log_level::ERROR);
+    pd::details::log(message, pd::log_level::ERROR);
 };
+
+/**
+     * @brief
+     * set the lowest log_level. Any level under it will be discarded.
+     * It is defined as an atomic operation so it's thread-safe
+     * @param level: the level wanted
+     */
+void set_log_level(pd::log_level level);
+
+} // namespace pd
