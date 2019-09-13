@@ -17,6 +17,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <queue>
 
 namespace {
 
@@ -138,14 +139,15 @@ public:
     file_logger(const logger_config_t &config);
     //    void log(const std::string &, const log_level) override;
     void log(const std::string &) override;
-    ~file_logger() override {}
+    ~file_logger() override;
 
 private:
     void roll_a_file();
     const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
     std::string filename_;
     std::unique_ptr<std::ofstream> os_;
-    std::unique_ptr<std::vector<char>> buf_;
+
+    std::queue<std::string> buf_;
 };
 
 using logger_creator = logger_base *(*) (const logger_config_t &);

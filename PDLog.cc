@@ -16,23 +16,6 @@ pd::details::std_out_logger::std_out_logger(const pd::details::logger_config_t &
     : levels_(level2string)
 {}
 
-//void pd::details::std_out_logger::log(const std::string &message, const pd::details::log_level lv)
-//{
-//    std::string output;
-//    output.reserve(message.length() + 128);
-//    output.append(::format_time())
-//        .append(levels_.find(lv)->second)
-//        .append("[Thread ID:")
-//        .append(std::to_string(threadid_to_index(std::this_thread::get_id())))
-//        .append("] ")
-//        .append(message)
-//        .push_back('\n');
-//    if (lv >= log_level::WARNING) {
-//        output.append(__FILE__).append(std::to_string(__LINE__)).append(__FUNCTION__);
-//    }
-//    log(output);
-//}
-
 void pd::details::std_out_logger::log(const std::string &message)
 {
     std::cout << message;
@@ -82,20 +65,12 @@ static std::atomic<size_t> log_id{0};
 pd::details::file_logger::file_logger(const pd::details::logger_config_t &config)
     : levels_(level2string)
     , os_(std::unique_ptr<std::ofstream>(new std::ofstream))
-    , buf_(std::unique_ptr<std::vector<char>>(new std::vector<char>))
 {
     auto name = config.find("file_name");
     if (name == config.end())
         throw std::runtime_error("NO FILE PROVIDED");
     filename_ = name->second;
 
-    //Benchmark shows increasing ofstream buffer cannot get an higher performance :(
-    //But I don't want to delete it so just let it go
-    constexpr int buf_size = 1024 * 128; //128k
-    buf_->resize(buf_size);
-
-    //mannualy increase stream's buffer
-    os_->rdbuf()->pubsetbuf(buf_->data(), buf_size);
     roll_a_file();
 }
 
@@ -129,12 +104,29 @@ void pd::details::file_logger::log(const std::string &message)
         roll_a_file();
     }
     std::lock_guard<std::mutex> lock(mutex_);
-    *os_.get() << message;
+    this->buf_.push(message);
+    if (buf_.size() >= 64) {
+        while (buf_.size() != 0) {
+            *os_.get() << buf_.front();
+            buf_.pop();
+        }
+    }
     // I think there is no need to flush everytime. It is much quicker ( Benchmark shows about 5-10X improvement) to write chars to buf_ before writting to disk.
     // flush() will be invoked when roll_a_file(). Under the lock's protection  it will be thread-safe and I hope
     // no logline will be discarded.  I will keep an eye on it.
 
     //    os_->flush();
+}
+
+pd::details::file_logger::~file_logger()
+{
+    if (this->buf_.empty())
+        return;
+    std::lock_guard<std::mutex> lock(mutex_);
+    while (buf_.size() != 0) {
+        *os_.get() << buf_.front();
+        buf_.pop();
+    }
 }
 
 void pd::details::file_logger::roll_a_file()
@@ -145,6 +137,9 @@ void pd::details::file_logger::roll_a_file()
         os_->flush();
         os_->close();
     }
+    //without std::experimental::filesystem or boost::filesystem, it needs to call system API to check
+    //whether dir "logs" exists.
+
     os_->open("logs/" + std::to_string(num_tail) + "_" + filename_,
               std::ofstream::out | std::ofstream::app);
 }
