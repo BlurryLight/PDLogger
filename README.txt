@@ -44,5 +44,4 @@ Thread count: 5
 	Average Log Latency = 22509 nanoseconds
 
 Known Issue:
-1. Due to the lack of std::filesystem, it fails when logs dir doesn't exist.
-2. Sometimes one log file may have less or more than 10000 lines. I'm digging into the reasons.
+1. Sometimes one log file may have less or more than 10000 lines. I'm digging into the reasons.

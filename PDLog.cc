@@ -1,7 +1,10 @@
 #include "PDLog.h"
 
+//====== Atomic vars
 static std::atomic<unsigned int> log_level_num{static_cast<unsigned int>(pd::log_level::INFO)};
+static std::atomic<size_t> log_id{0};
 
+//======
 void pd::set_log_level(pd::log_level level)
 {
     log_level_num.store(static_cast<size_t>(level));
@@ -60,7 +63,6 @@ pd::details::logger_base &pd::details::get_logger(const pd::details::logger_conf
     return *logger_singleton;
 }
 
-static std::atomic<size_t> log_id{0};
 
 pd::details::file_logger::file_logger(const pd::details::logger_config_t &config)
     : levels_(level2string)
@@ -70,8 +72,9 @@ pd::details::file_logger::file_logger(const pd::details::logger_config_t &config
     if (name == config.end())
         throw std::runtime_error("NO FILE PROVIDED");
     filename_ = name->second;
+    fs::create_directory("logs");
 
-    roll_a_file();
+    //    roll_a_file();
 }
 
 void pd::details::logger_base::log(const std::string &message, const pd::log_level lv)
@@ -99,7 +102,7 @@ void pd::details::logger_base::log(const std::string &message, const pd::log_lev
 
 void pd::details::file_logger::log(const std::string &message)
 {
-    if (((++log_id) % 10000) == 0) {
+    if (((++log_id) % 10000) == 0) { //output from 1
         roll_a_file();
         swap_then_write();
     }

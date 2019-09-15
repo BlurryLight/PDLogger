@@ -23,7 +23,9 @@ add_library(PDLog SHARED
    # buffer.cc
 )
 add_executable(benchmark examples/pdlog_benchmark.cpp)
-target_link_libraries(benchmark PDLogStatic Threads::Threads)
+# ugly hacking to link stdc++fs since it's a experimental feature in C++11
+# in C++17 the stdc++fs should be removed from here
+target_link_libraries(benchmark PDLogStatic Threads::Threads stdc++fs )
 if ( CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU" )
     target_compile_options(PDLog PRIVATE -Wall)
 endif()
