@@ -2,6 +2,7 @@ Inspired by kevinkreiser's great logging tool[https://gist.github.com/kevinkreis
 PDLog is a thread-safe, cross-platform, fast and user-friendly logging tool.
 
 
+
 https://github.com/BlurryLight/PDLogger
 
 
@@ -16,6 +17,8 @@ Usage:
     Examples show how to work with the tool.
 
 Benchmark:
+On I7 4720HQ(2.8GHZ),HDD, each thread has 100,000 lines to write. All LOGS are Guarenteed!
+Totally 150,0000 Lines, which means 150 files, are written.
 
 Because the usage of std::mutex,the lock, the time spent on logging has a linear relationship with the threads number.
 

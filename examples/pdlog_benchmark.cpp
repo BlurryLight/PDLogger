@@ -19,10 +19,11 @@ void log_benchmark()
     int const iterations = 100000;
     char const *const benchmark = "benchmark";
     uint64_t begin = timestamp_now();
+    std::stringstream os;
     for (int i = 0; i < iterations; ++i) {
-        std::stringstream os;
         os << "Logging " << benchmark << i << 0 << 'K' << -42.42;
         pd::INFO(os.str());
+        os.str("");
     }
 
     uint64_t end = timestamp_now();
