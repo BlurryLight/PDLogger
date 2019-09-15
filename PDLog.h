@@ -8,6 +8,7 @@
 #include <chrono>
 #include <ctime> //std::localtime
 #include <fstream>
+#include <future>
 #include <iomanip> //std::put_time
 #include <iostream>
 #include <memory>
@@ -143,6 +144,7 @@ public:
 
 private:
     void roll_a_file();
+    void swap_then_write();
     const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
     std::string filename_;
     std::unique_ptr<std::ofstream> os_;

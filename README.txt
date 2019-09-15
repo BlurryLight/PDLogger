@@ -20,22 +20,26 @@ Benchmark:
 Because the usage of std::mutex,the lock, the time spent on logging has a linear relationship with the threads number.
 
 Thread count: 1
-        Average Log Latency = 5382 nanoseconds
+	Average Log Latency = 4964 nanoseconds
 Thread count: 2
-        Average Log Latency = 8360 nanoseconds
-        Average Log Latency = 8400 nanoseconds
+	Average Log Latency = 4782 nanoseconds
+	Average Log Latency = 5566 nanoseconds
 Thread count: 3
-        Average Log Latency = 16731 nanoseconds
-        Average Log Latency = 16765 nanoseconds
-        Average Log Latency = 16781 nanoseconds
+	Average Log Latency = 8843 nanoseconds
+	Average Log Latency = 9168 nanoseconds
+	Average Log Latency = 9279 nanoseconds
 Thread count: 4
-        Average Log Latency = 23563 nanoseconds
-        Average Log Latency = 23992 nanoseconds
-        Average Log Latency = 24026 nanoseconds
-        Average Log Latency = 24030 nanoseconds
+	Average Log Latency = 15335 nanoseconds
+	Average Log Latency = 15874 nanoseconds
+	Average Log Latency = 16076 nanoseconds
+	Average Log Latency = 16450 nanoseconds
 Thread count: 5
-        Average Log Latency = 31948 nanoseconds
-        Average Log Latency = 32414 nanoseconds
-        Average Log Latency = 32493 nanoseconds
-        Average Log Latency = 32589 nanoseconds
-        Average Log Latency = 32666 nanoseconds
+	Average Log Latency = 22226 nanoseconds
+	Average Log Latency = 22267 nanoseconds
+	Average Log Latency = 22302 nanoseconds
+	Average Log Latency = 22402 nanoseconds
+	Average Log Latency = 22509 nanoseconds
+
+Known Issue:
+1. Due to the lack of std::filesystem, it fails when logs dir doesn't exist.
+2. Sometimes one log file may have less or more than 10000 lines. I'm digging into the reasons.

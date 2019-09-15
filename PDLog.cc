@@ -99,18 +99,12 @@ void pd::details::logger_base::log(const std::string &message, const pd::log_lev
 
 void pd::details::file_logger::log(const std::string &message)
 {
-    log_id++; //atomic operation
-    if ((log_id.load(std::memory_order_relaxed) % 10000) == 0) {
+    if (((++log_id) % 10000) == 0) {
         roll_a_file();
+        swap_then_write();
     }
     std::lock_guard<std::mutex> lock(mutex_);
     this->buf_.push(message);
-    if (buf_.size() >= 64) {
-        while (buf_.size() != 0) {
-            *os_.get() << buf_.front();
-            buf_.pop();
-        }
-    }
     // I think there is no need to flush everytime. It is much quicker ( Benchmark shows about 5-10X improvement) to write chars to buf_ before writting to disk.
     // flush() will be invoked when roll_a_file(). Under the lock's protection  it will be thread-safe and I hope
     // no logline will be discarded.  I will keep an eye on it.
@@ -131,7 +125,7 @@ pd::details::file_logger::~file_logger()
 
 void pd::details::file_logger::roll_a_file()
 {
-    size_t num_tail = (log_id.load(std::memory_order_relaxed)) / 10000;
+    size_t num_tail = (log_id.load() / 10000);
     std::lock_guard<std::mutex> lock(mutex_);
     if (os_->is_open()) {
         os_->flush();
@@ -142,4 +136,23 @@ void pd::details::file_logger::roll_a_file()
 
     os_->open("logs/" + std::to_string(num_tail) + "_" + filename_,
               std::ofstream::out | std::ofstream::app);
+}
+void pd::details::file_logger::swap_then_write()
+{
+    std::queue<std::string> tmp_buf;
+    while (true) {
+        if (this->mutex_.try_lock()) {
+            tmp_buf.swap(this->buf_);
+            break;
+        }
+    }
+    mutex_.unlock();
+
+    auto write_fn = [&]() {
+        while (tmp_buf.size() != 0) {
+            *os_.get() << tmp_buf.front();
+            tmp_buf.pop();
+        }
+    };
+    std::async(std::launch::async, write_fn);
 }
