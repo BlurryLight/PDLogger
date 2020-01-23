@@ -45,9 +45,9 @@ public:
     return queue_ptr_->empty();
   }
 
-  bool empty() const { return queue_ptr_->empty(); }
+  //  bool empty() const { return queue_ptr_->empty(); }
 
-private:
+  private:
   std::unique_ptr<std::queue<T, std::deque<T>>> queue_ptr_; // deque
   std::mutex mutex_;
   std::condition_variable cond_;
