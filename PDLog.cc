@@ -63,7 +63,6 @@ pd::details::logger_base &pd::details::get_logger(const pd::details::logger_conf
     return *logger_singleton;
 }
 
-
 pd::details::file_logger::file_logger(const pd::details::logger_config_t &config)
     : levels_(level2string)
     , os_(std::unique_ptr<std::ofstream>(new std::ofstream))
@@ -74,7 +73,17 @@ pd::details::file_logger::file_logger(const pd::details::logger_config_t &config
     filename_ = name->second;
     fs::create_directory("logs");
 
-    //    roll_a_file();
+    worker_ = std::thread([&]() {
+        while (true) {
+            size_t tmp = log_id.fetch_add(1);
+            if ((tmp % 10000) == 0) { //output from 1
+
+                roll_a_file(tmp / 10000);
+            }
+            *os_.get() << buf_.pop(); //buf_ will block when queue is empty
+        }
+    });
+    worker_.detach();
 }
 
 void pd::details::logger_base::log(const std::string &message, const pd::log_level lv)
@@ -102,11 +111,6 @@ void pd::details::logger_base::log(const std::string &message, const pd::log_lev
 
 void pd::details::file_logger::log(const std::string &message)
 {
-    if (((++log_id) % 10000) == 0) { //output from 1
-        roll_a_file();
-        swap_then_write();
-    }
-    std::lock_guard<std::mutex> lock(mutex_);
     this->buf_.push(message);
     // I think there is no need to flush everytime. It is much quicker ( Benchmark shows about 5-10X improvement) to write chars to buf_ before writting to disk.
     // flush() will be invoked when roll_a_file(). Under the lock's protection  it will be thread-safe and I hope
@@ -117,18 +121,14 @@ void pd::details::file_logger::log(const std::string &message)
 
 pd::details::file_logger::~file_logger()
 {
-    if (this->buf_.empty())
-        return;
-    std::lock_guard<std::mutex> lock(mutex_);
-    while (buf_.size() != 0) {
-        *os_.get() << buf_.front();
-        buf_.pop();
+    while (!buf_.empty()) //wait the worker to finish
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 
-void pd::details::file_logger::roll_a_file()
+void pd::details::file_logger::roll_a_file(size_t num_tail)
 {
-    size_t num_tail = (log_id.load() / 10000);
     std::lock_guard<std::mutex> lock(mutex_);
     if (os_->is_open()) {
         os_->flush();
@@ -140,7 +140,7 @@ void pd::details::file_logger::roll_a_file()
     os_->open("logs/" + std::to_string(num_tail) + "_" + filename_,
               std::ofstream::out | std::ofstream::app);
 }
-void pd::details::file_logger::swap_then_write()
+/*void pd::details::file_logger::swap_then_write()
 {
     std::queue<std::string> tmp_buf;
     while (true) {
@@ -158,4 +158,4 @@ void pd::details::file_logger::swap_then_write()
         }
     };
     std::async(std::launch::async, write_fn);
-}
+}*/

@@ -4,6 +4,7 @@
  * g++ -std=gnuc++11 -pthread logging.h
  */
 
+#include "safe_queue.hpp"
 #include <atomic>
 #include <chrono>
 #include <ctime> //std::localtime
@@ -18,7 +19,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <queue>
 
 #if __cplusplus < 201703L // If the version of C++ is less than 17
 // It was still in the experimental:: namespace
@@ -152,13 +152,14 @@ public:
     ~file_logger() override;
 
 private:
-    void roll_a_file();
+    void roll_a_file(size_t num_tail);
     void swap_then_write();
     const std::unordered_map<log_level, std::string, log_level_hash_helper> levels_;
     std::string filename_;
     std::unique_ptr<std::ofstream> os_;
 
-    std::queue<std::string> buf_;
+    safe_queue<std::string> buf_;
+    std::thread worker_;
 };
 
 using logger_creator = logger_base *(*) (const logger_config_t &);

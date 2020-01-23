@@ -19,6 +19,7 @@ set_target_properties(PDLogStatic PROPERTIES OUTPUT_NAME PDLog)
 add_library(PDLog SHARED
     PDLog.h
     PDLog.cc
+    safe_queue.hpp
    # buffer.h
    # buffer.cc
 )
