@@ -22,6 +22,9 @@
 
 #if __cplusplus < 201703L // If the version of C++ is less than 17
 // It was still in the experimental:: namespace
+#if _WIN32
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#endif
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 #else
@@ -109,6 +112,18 @@ bool check_log_level(log_level level);
  */
 using logger_config_t = std::unordered_map<std::string, std::string>;
 
+class spin_lock
+{
+    std::atomic<bool> lock_ = {false};
+
+public:
+    void lock()
+    {
+        while (lock_.exchange(true, std::memory_order_acquire))
+            ;
+    }
+    void unlock() { lock_.store(false, std::memory_order_release); }
+};
 /**
  * @brief The logger_base class is an ABSTRACT-CLASS which has some defined
  * interfaces
@@ -125,7 +140,7 @@ public:
     logger_base() {}
 
 protected:
-    std::mutex mutex_;
+    spin_lock lock_;
     uint8_t id_;
 };
 

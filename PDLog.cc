@@ -12,7 +12,7 @@ void pd::set_log_level(pd::log_level level)
 
 bool pd::details::check_log_level(pd::log_level level)
 {
-    return static_cast<size_t>(level) >= log_level_num.load(std::memory_order_relaxed);
+    return static_cast<size_t>(level) >= log_level_num.load(std::memory_order_acquire);
 }
 
 pd::details::std_out_logger::std_out_logger(const pd::details::logger_config_t &config)
@@ -102,12 +102,13 @@ void pd::details::logger_base::log(const std::string &message, const pd::log_lev
 
 void pd::details::file_logger::log(const std::string &message)
 {
+    this->lock_.lock();
     if (((++log_id) % 10000) == 0) { //output from 1
         roll_a_file();
         swap_then_write();
     }
-    std::lock_guard<std::mutex> lock(mutex_);
     this->buf_.push(message);
+    this->lock_.unlock();
     // I think there is no need to flush everytime. It is much quicker ( Benchmark shows about 5-10X improvement) to write chars to buf_ before writting to disk.
     // flush() will be invoked when roll_a_file(). Under the lock's protection  it will be thread-safe and I hope
     // no logline will be discarded.  I will keep an eye on it.
@@ -119,17 +120,17 @@ pd::details::file_logger::~file_logger()
 {
     if (this->buf_.empty())
         return;
-    std::lock_guard<std::mutex> lock(mutex_);
+    this->lock_.lock();
     while (buf_.size() != 0) {
         *os_.get() << buf_.front();
         buf_.pop();
     }
+    this->lock_.unlock();
 }
 
 void pd::details::file_logger::roll_a_file()
 {
     size_t num_tail = (log_id.load() / 10000);
-    std::lock_guard<std::mutex> lock(mutex_);
     if (os_->is_open()) {
         os_->flush();
         os_->close();
@@ -143,14 +144,7 @@ void pd::details::file_logger::roll_a_file()
 void pd::details::file_logger::swap_then_write()
 {
     std::queue<std::string> tmp_buf;
-    while (true) {
-        if (this->mutex_.try_lock()) {
-            tmp_buf.swap(this->buf_);
-            break;
-        }
-    }
-    mutex_.unlock();
-
+    tmp_buf.swap(this->buf_);
     auto write_fn = [&]() {
         while (tmp_buf.size() != 0) {
             *os_.get() << tmp_buf.front();
